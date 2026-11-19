@@ -38,7 +38,15 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IBahaGuardDbContext>(sp => sp.GetRequiredService<BahaGuardDbContext>());
-        services.AddScoped<IGeminiVisionService, GeminiFloodAnalyzer>();
+
+        // Configure Gemini AI service with resilient HTTP Client
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient<IGeminiVisionService, GeminiFloodAnalyzer>((sp, client) =>
+        {
+            var options = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
+        });
+
         services.AddHostedService<ReportExpirationWorker>();
 
         return services;
