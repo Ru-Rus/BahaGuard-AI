@@ -1,135 +1,207 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using BahaGuard.Application.DTOs;
 using BahaGuard.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace BahaGuard.Infrastructure.AI;
 
 /// <summary>
-/// Phase 1 Placeholder/Mock implementation of the Gemini Flood Analyzer.
-/// Evaluates commuter report descriptions and returns structured flood intelligence.
-/// Will be replaced/extended with real Gemini 2.5 Flash Multimodal Vision calls in Phase 2.
+/// Multimodal Gemini 2.5 Flash Flood Analyzer.
+/// Combines street photo visual indicators with Tagalog/Taglish NLP parsing,
+/// enforcing Google Gemini Structured Outputs matching the Section 5 JSON Schema.
+/// Includes graceful fallback to the local TaglishNormalizer when offline or unconfigured.
 /// </summary>
 public class GeminiFloodAnalyzer : IGeminiVisionService
 {
+    private readonly HttpClient _httpClient;
+    private readonly GeminiOptions _options;
     private readonly ILogger<GeminiFloodAnalyzer> _logger;
+    private readonly string _effectiveApiKey;
 
-    public GeminiFloodAnalyzer(ILogger<GeminiFloodAnalyzer> logger)
+    private static readonly JsonSerializerOptions JsonOpts = new()
     {
+        PropertyNameCaseInsensitive = true
+    };
+
+    public GeminiFloodAnalyzer(
+        HttpClient httpClient,
+        IOptions<GeminiOptions> options,
+        IConfiguration configuration,
+        ILogger<GeminiFloodAnalyzer> logger)
+    {
+        _httpClient = httpClient;
+        _options = options.Value;
         _logger = logger;
+
+        // Resolve API key from Options or environment variables
+        _effectiveApiKey = !string.IsNullOrWhiteSpace(_options.ApiKey)
+            ? _options.ApiKey
+            : configuration["GEMINI_API_KEY"] 
+              ?? configuration["Google:ApiKey"] 
+              ?? configuration["Gemini:ApiKey"] 
+              ?? string.Empty;
     }
 
-    public Task<FloodAnalysisResultDto> AnalyzeIncidentAsync(
+    public async Task<FloodAnalysisResultDto> AnalyzeIncidentAsync(
         string rawDescription,
         Stream? imageStream = null,
         string? mimeType = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Analyzing flood incident report (Phase 1 Mock): {Description}", rawDescription);
+        bool hasImage = imageStream != null && imageStream.Length > 0;
 
-        var lower = rawDescription.ToLowerInvariant();
-
-        // Spam or test rejection heuristic
-        if (lower.Contains("spam") || lower.Contains("not flood") || lower.Contains("test fake"))
+        if (string.IsNullOrWhiteSpace(_effectiveApiKey))
         {
-            return Task.FromResult(new FloodAnalysisResultDto(
-                IsValidFloodReport: false,
-                RejectionReason: "Uploaded incident content does not depict street flooding in Metro Manila.",
-                NormalizedLocation: "Unknown",
-                EstimatedDepthInches: 0,
-                DepthCategory: "Dry",
-                Passability: new PassabilityDto(true, true, true),
-                ConfidenceScore: 0.95m,
-                CommuterAdvisory: "Incident rejected: non-flood content."
-            ));
+            _logger.LogInformation("Gemini API Key is not configured. Utilizing local TaglishNormalizer engine.");
+            return TaglishNormalizer.Normalize(rawDescription, hasImage);
         }
 
-        // Taglish Depth & Passability Heuristic
-        int depthInches = 8;
-        string depthCategory = "HalfTire";
-        bool passableMotorcycle = false;
-        bool passableSedan = true;
-        bool passableSuv = true;
-        string advisory = "Water level rising. Light vehicles advise alternate route.";
+        try
+        {
+            return await CallGeminiStructuredOutputAsync(rawDescription, imageStream, mimeType, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gemini API call failed or timed out. Falling back to TaglishNormalizer.");
+            return TaglishNormalizer.Normalize(rawDescription, hasImage);
+        }
+    }
 
-        if (lower.Contains("tuhod") || lower.Contains("knee") || lower.Contains("binti"))
-        {
-            depthInches = 15;
-            depthCategory = "Knee";
-            passableMotorcycle = false;
-            passableSedan = false;
-            passableSuv = true;
-            advisory = "Knee-deep flood. Not passable to light vehicles and sedans. SUVs and trucks use caution.";
-        }
-        else if (lower.Contains("bewang") || lower.Contains("waist") || lower.Contains("lubog"))
-        {
-            depthInches = 28;
-            depthCategory = "Waist";
-            passableMotorcycle = false;
-            passableSedan = false;
-            passableSuv = false;
-            advisory = "Waist-deep severe flood. Impassable to all types of vehicles. Avoid this corridor.";
-        }
-        else if (lower.Contains("gutter") || lower.Contains("gutter-deep") || lower.Contains("talampakan"))
-        {
-            depthInches = 4;
-            depthCategory = "Gutter";
-            passableMotorcycle = true;
-            passableSedan = true;
-            passableSuv = true;
-            advisory = "Gutter-deep water. Passable to all vehicles. Drive with moderate caution.";
-        }
-        else if (lower.Contains("gulong") || lower.Contains("tire") || lower.Contains("half tire"))
-        {
-            depthInches = 10;
-            depthCategory = "HalfTire";
-            passableMotorcycle = false;
-            passableSedan = true;
-            passableSuv = true;
-            advisory = "Half-tire deep water. Motorcycles not advised. Sedans proceed with caution.";
-        }
+    private async Task<FloodAnalysisResultDto> CallGeminiStructuredOutputAsync(
+        string rawDescription,
+        Stream? imageStream,
+        string? mimeType,
+        CancellationToken cancellationToken)
+    {
+        var model = string.IsNullOrWhiteSpace(_options.Model) ? "gemini-2.5-flash" : _options.Model;
+        var url = $"{_options.BaseUrl.TrimEnd('/')}/models/{model}:generateContent?key={_effectiveApiKey}";
 
-        // Normalized location extraction heuristic for Manila landmarks
-        string normalizedLocation = "Metro Manila Street";
-        if (lower.Contains("españa") || lower.Contains("espana"))
+        var partsArray = new JsonArray
         {
-            normalizedLocation = lower.Contains("lacson") 
-                ? "España Blvd cor. Lacson Ave, Sampaloc, Manila" 
-                : "España Blvd (UST area), Sampaloc, Manila";
-        }
-        else if (lower.Contains("taft"))
+            new JsonObject
+            {
+                ["text"] = $"Analyze commuter report: \"{rawDescription}\""
+            }
+        };
+
+        // Attach image inlineData if present
+        if (imageStream != null && imageStream.Length > 0)
         {
-            normalizedLocation = lower.Contains("pedro gil") 
-                ? "Taft Ave cor. Pedro Gil St, Malate, Manila" 
-                : "Taft Ave (PGH/UN Ave area), Manila";
-        }
-        else if (lower.Contains("edsa"))
-        {
-            normalizedLocation = "EDSA, Metro Manila";
-        }
-        else if (lower.Contains("quiapo"))
-        {
-            normalizedLocation = "Quezon Blvd (Quiapo Church area), Manila";
-        }
-        else if (lower.Contains("morayta") || lower.Contains("nicanor reyes"))
-        {
-            normalizedLocation = "Nicanor Reyes St (Morayta), Sampaloc, Manila";
-        }
-        else
-        {
-            normalizedLocation = char.ToUpperInvariant(rawDescription[0]) + rawDescription[1..Math.Min(rawDescription.Length, 60)];
+            if (imageStream.CanSeek)
+            {
+                imageStream.Seek(0, SeekOrigin.Begin);
+            }
+
+            using var memoryStream = new MemoryStream();
+            await imageStream.CopyToAsync(memoryStream, cancellationToken);
+            var base64Data = Convert.ToBase64String(memoryStream.ToArray());
+
+            partsArray.Add(new JsonObject
+            {
+                ["inlineData"] = new JsonObject
+                {
+                    ["mimeType"] = string.IsNullOrWhiteSpace(mimeType) ? "image/jpeg" : mimeType,
+                    ["data"] = base64Data
+                }
+            });
         }
 
-        var result = new FloodAnalysisResultDto(
-            IsValidFloodReport: true,
-            RejectionReason: null,
-            NormalizedLocation: normalizedLocation,
-            EstimatedDepthInches: depthInches,
-            DepthCategory: depthCategory,
-            Passability: new PassabilityDto(passableMotorcycle, passableSedan, passableSuv),
-            ConfidenceScore: 0.91m,
-            CommuterAdvisory: advisory
-        );
+        var requestBody = new JsonObject
+        {
+            ["systemInstruction"] = new JsonObject
+            {
+                ["parts"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["text"] = "You are a Metro Manila flood and traffic intelligence analyzer. Analyze the uploaded street photo and Tagalog/Taglish commuter report. Estimate water depth using visual references (curbs, sidewalks, vehicle tires, jeepney step-boards, pedestrians). Reject images unrelated to streets/weather/flooding by setting isValidFloodReport to false."
+                    }
+                }
+            },
+            ["contents"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["role"] = "user",
+                    ["parts"] = partsArray
+                }
+            },
+            ["generationConfig"] = new JsonObject
+            {
+                ["temperature"] = 0.2,
+                ["responseMimeType"] = "application/json",
+                ["responseSchema"] = new JsonObject
+                {
+                    ["type"] = "OBJECT",
+                    ["properties"] = new JsonObject
+                    {
+                        ["isValidFloodReport"] = new JsonObject { ["type"] = "BOOLEAN" },
+                        ["rejectionReason"] = new JsonObject { ["type"] = "STRING", ["nullable"] = true },
+                        ["normalizedLocation"] = new JsonObject
+                        {
+                            ["type"] = "STRING",
+                            ["description"] = "Clean intersection or landmark name in Metro Manila extracted from Taglish text"
+                        },
+                        ["estimatedDepthInches"] = new JsonObject { ["type"] = "INTEGER" },
+                        ["depthCategory"] = new JsonObject
+                        {
+                            ["type"] = "STRING",
+                            ["enum"] = new JsonArray { "Dry", "Gutter", "HalfTire", "Knee", "Waist", "ChestPlus" }
+                        },
+                        ["passability"] = new JsonObject
+                        {
+                            ["type"] = "OBJECT",
+                            ["properties"] = new JsonObject
+                            {
+                                ["motorcycle"] = new JsonObject { ["type"] = "BOOLEAN" },
+                                ["sedan"] = new JsonObject { ["type"] = "BOOLEAN" },
+                                ["suvOrJeepney"] = new JsonObject { ["type"] = "BOOLEAN" }
+                            },
+                            ["required"] = new JsonArray { "motorcycle", "sedan", "suvOrJeepney" }
+                        },
+                        ["confidenceScore"] = new JsonObject { ["type"] = "NUMBER" },
+                        ["commuterAdvisory"] = new JsonObject
+                        {
+                            ["type"] = "STRING",
+                            ["description"] = "1-sentence practical warning in clear English/Taglish for drivers"
+                        }
+                    },
+                    ["required"] = new JsonArray
+                    {
+                        "isValidFloodReport",
+                        "normalizedLocation",
+                        "estimatedDepthInches",
+                        "depthCategory",
+                        "passability",
+                        "confidenceScore",
+                        "commuterAdvisory"
+                    }
+                }
+            }
+        };
 
-        return Task.FromResult(result);
+        var content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json");
+
+        using var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(responseJson);
+
+        var candidate = doc.RootElement.GetProperty("candidates")[0];
+        var text = candidate.GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new InvalidOperationException("Gemini returned empty structured output text.");
+        }
+
+        var result = JsonSerializer.Deserialize<FloodAnalysisResultDto>(text, JsonOpts);
+        return result ?? throw new InvalidOperationException("Failed to deserialize Gemini structured response.");
     }
 }

@@ -1,6 +1,8 @@
 using BahaGuard.Application.Interfaces;
 using BahaGuard.Infrastructure.AI;
 using BahaGuard.Infrastructure.Data;
+using BahaGuard.Infrastructure.Options;
+using BahaGuard.Infrastructure.Services;
 using BahaGuard.Infrastructure.Workers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -38,8 +40,37 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IBahaGuardDbContext>(sp => sp.GetRequiredService<BahaGuardDbContext>());
-        services.AddScoped<IGeminiVisionService, GeminiFloodAnalyzer>();
+
+        // Configure Gemini AI service with resilient HTTP Client
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient<IGeminiVisionService, GeminiFloodAnalyzer>((sp, client) =>
+        {
+            var options = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
+        });
+
+        services.AddHttpClient<IPropertyAuditService, PropertyAuditService>((sp, client) =>
+        {
+            var options = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
+        });
+
+        // Automated News & Official Alert Ingestion Services
+        services.Configure<NewsFeedOptions>(configuration.GetSection(NewsFeedOptions.SectionName));
+        services.AddHttpClient<INewsFeedReader, RssNewsFeedReader>((sp, client) =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
+        services.AddHttpClient<INewsFloodExtractor, NewsFloodExtractor>((sp, client) =>
+        {
+            var options = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
+        });
+        services.AddScoped<INewsAlertIngestionService, NewsAlertIngestionService>();
+
+        // Hosted Background Workers
         services.AddHostedService<ReportExpirationWorker>();
+        services.AddHostedService<NewsAlertIngestionWorker>();
 
         return services;
     }

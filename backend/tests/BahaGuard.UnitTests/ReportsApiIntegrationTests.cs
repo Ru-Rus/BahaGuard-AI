@@ -14,6 +14,7 @@ public class ReportsApiIntegrationTests : IClassFixture<WebApplicationFactory<Pr
 {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly Mock<IFloodReportService> _mockFloodReportService = new();
+    private readonly Mock<IPropertyAuditService> _mockAuditService = new();
 
     public ReportsApiIntegrationTests(WebApplicationFactory<Program> factory)
     {
@@ -22,6 +23,7 @@ public class ReportsApiIntegrationTests : IClassFixture<WebApplicationFactory<Pr
             builder.ConfigureTestServices(services =>
             {
                 services.AddScoped<IFloodReportService>(_ => _mockFloodReportService.Object);
+                services.AddScoped<IPropertyAuditService>(_ => _mockAuditService.Object);
             });
         });
     }
@@ -39,15 +41,38 @@ public class ReportsApiIntegrationTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task PropertyAudit_ShouldReturnStub()
+    public async Task PropertyAudit_ShouldReturnAuditedResponse()
     {
+        _mockAuditService.Setup(s => s.AuditPropertyAsync(
+            It.IsAny<PropertyAuditQuery>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PropertyAuditResponseDto(
+                Address: "España Blvd",
+                ResolvedLocationName: "España Blvd (UST Basin)",
+                Latitude: 14.6091,
+                Longitude: 120.9903,
+                RiskScore: 8,
+                RiskLevel: "High",
+                HistoricalIncidentsCount: 6,
+                AverageDepthInches: 24.0,
+                MaxDepthInches: 36,
+                PredominantDepthCategory: "Waist",
+                EstimatedRecedingTimeHours: 4.5,
+                VehicleVulnerability: new VehicleVulnerabilityDto(true, true, false, "Elevated parking required"),
+                DueDiligenceReport: new TenantDueDiligenceDto("High flood danger", "Avoid ground units", "Generator above street", "Elevated foot routes"),
+                AuditedAt: DateTimeOffset.UtcNow
+            ));
+
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync("/api/property-audit?address=España%20Blvd&lat=14.6091&lng=120.9903");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("Upcoming in Phase 4", content);
+        var result = await response.Content.ReadFromJsonAsync<PropertyAuditResponseDto>();
+        Assert.NotNull(result);
+        Assert.Equal("High", result.RiskLevel);
+        Assert.Equal(8, result.RiskScore);
+        Assert.Equal(6, result.HistoricalIncidentsCount);
     }
 
     [Fact]
@@ -229,5 +254,31 @@ public class ReportsApiIntegrationTests : IClassFixture<WebApplicationFactory<Pr
 
         Assert.NotNull(lastResponse);
         Assert.Equal(HttpStatusCode.TooManyRequests, lastResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmReport_WhenValid_ShouldReturnOk()
+    {
+        var reportId = Guid.NewGuid();
+        _mockFloodReportService.Setup(s => s.ConfirmReportAsync(
+            reportId,
+            It.IsAny<ConfirmReportRequestDto>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConfirmReportResponseDto(
+                ReportId: reportId,
+                Status: "Active",
+                ExpiresAt: DateTimeOffset.UtcNow.AddHours(2),
+                Message: "Validity extended"
+            ));
+
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync($"/api/reports/{reportId}/confirm", new ConfirmReportRequestDto(true));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<ConfirmReportResponseDto>();
+        Assert.NotNull(result);
+        Assert.Equal(reportId, result.ReportId);
+        Assert.Equal("Active", result.Status);
     }
 }

@@ -1,3 +1,4 @@
+using BahaGuard.Application.Interfaces;
 using BahaGuard.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,26 +8,18 @@ using Microsoft.Extensions.Logging;
 namespace BahaGuard.Infrastructure.Workers;
 
 /// <summary>
-/// Background worker that periodically checks for expired flood reports
-/// and marks them as 'Receding' or 'Resolved'.
+/// Background worker that periodically checks for expired flood reports,
+/// marks them as 'Resolved', and broadcasts live status changes via SignalR.
 /// </summary>
-public class ReportExpirationWorker : BackgroundService
+public class ReportExpirationWorker(
+    IServiceProvider serviceProvider,
+    ILogger<ReportExpirationWorker> logger) : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<ReportExpirationWorker> _logger;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(2);
-
-    public ReportExpirationWorker(
-        IServiceProvider serviceProvider,
-        ILogger<ReportExpirationWorker> logger)
-    {
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("ReportExpirationWorker is running.");
+        logger.LogInformation("ReportExpirationWorker is running (check interval: {Interval}).", _checkInterval);
 
         using var timer = new PeriodicTimer(_checkInterval);
 
@@ -34,7 +27,7 @@ public class ReportExpirationWorker : BackgroundService
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                using var scope = serviceProvider.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<BahaGuardDbContext>();
 
                 var now = DateTimeOffset.UtcNow;
@@ -50,7 +43,16 @@ public class ReportExpirationWorker : BackgroundService
                     }
 
                     await dbContext.SaveChangesAsync(stoppingToken);
-                    _logger.LogInformation("Auto-resolved {Count} expired flood reports.", expiredReports.Count);
+                    logger.LogInformation("Auto-resolved {Count} expired flood reports.", expiredReports.Count);
+
+                    var notifier = scope.ServiceProvider.GetService<IFloodAlertNotifier>();
+                    if (notifier != null)
+                    {
+                        foreach (var report in expiredReports)
+                        {
+                            await notifier.BroadcastReportStatusUpdateAsync(report.Id, report.Status, stoppingToken);
+                        }
+                    }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -59,10 +61,8 @@ public class ReportExpirationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while executing ReportExpirationWorker.");
+                logger.LogError(ex, "Error occurred while executing ReportExpirationWorker.");
             }
         }
-
-        _logger.LogInformation("ReportExpirationWorker is stopping.");
     }
 }
