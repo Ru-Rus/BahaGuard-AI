@@ -30,26 +30,27 @@ import { RouterLink } from '@angular/router';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="relative w-full h-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
+    <div class="relative w-full h-[100dvh] overflow-hidden bg-slate-950 font-sans text-slate-100 flex flex-col">
       <!-- Top Navigation & Live Header -->
-      <header class="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <span class="text-2xl">🌊</span>
+      <header class="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl">
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
+            <span class="text-xl sm:text-2xl">🌊</span>
           </div>
           <div>
-            <div class="flex items-center gap-2">
-              <h1 class="font-extrabold text-lg text-white tracking-tight">BahaGuard AI</h1>
-              <span class="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                Metro Manila
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <h1 class="font-extrabold text-base sm:text-lg text-white tracking-tight">BahaGuard AI</h1>
+              <span class="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                <span class="sm:hidden">MM</span>
+                <span class="hidden sm:inline">Metro Manila</span>
               </span>
             </div>
-            <p class="text-xs text-slate-400">Live Crowdsourced & AI-Verified Flood Passability</p>
+            <p class="hidden sm:block text-xs text-slate-400">Live Crowdsourced & AI-Verified Flood Passability</p>
           </div>
         </div>
 
         <!-- Real-Time SignalR Status Indicator -->
-        <div class="hidden sm:flex items-center gap-4 text-xs font-medium">
+        <div class="hidden md:flex items-center gap-4 text-xs font-medium">
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700">
             <span
               class="w-2.5 h-2.5 rounded-full"
@@ -59,33 +60,31 @@ import { RouterLink } from '@angular/router';
               {{ signalrService.isConnected() ? 'Live SignalR Connected' : 'Connecting to Alerts...' }}
             </span>
           </div>
-
-          <!-- Quick Landmark Jump -->
-          <div class="flex items-center gap-1.5">
-            <span class="text-slate-400 text-xs">Jump:</span>
-            @for (preset of geoService.presets; track preset.name) {
-              <button
-                (click)="jumpToPreset(preset)"
-                class="px-2 py-1 rounded-md text-xs bg-slate-800 hover:bg-cyan-600 hover:text-white transition border border-slate-700/60"
-              >
-                {{ preset.name.split(' ')[0] }}
-              </button>
-            }
-          </div>
         </div>
 
         <!-- Action Buttons: Audit & Report Flood -->
         <div class="flex items-center gap-2">
+          <!-- Mobile SignalR Dot -->
+          <div class="md:hidden flex items-center pr-1" title="SignalR live alert stream">
+            <span
+              class="w-2.5 h-2.5 rounded-full"
+              [class]="signalrService.isConnected() ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"
+            ></span>
+          </div>
+
+          <!-- Property Auditor Link -->
           <a
             routerLink="/audit"
-            class="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 hover:text-white font-medium text-xs border border-slate-700/80 transition shadow-sm"
+            class="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs border border-slate-700/80 transition shadow-sm active:scale-95"
           >
             <span>🛡️</span>
-            <span>Property Auditor</span>
+            <span class="hidden xs:inline sm:inline">Auditor</span>
           </a>
+
+          <!-- Desktop Report Flood Button -->
           <button
             (click)="isReportModalOpen.set(true)"
-            class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/25 transition active:scale-95"
+            class="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/25 transition active:scale-95"
           >
             <span>📸</span>
             <span>Report Flood</span>
@@ -93,11 +92,12 @@ import { RouterLink } from '@angular/router';
         </div>
       </header>
 
-      <!-- Vehicle Filter Floating Bar (Roadmap Section 6: Vehicle Filter Bar) -->
-      <div class="absolute top-20 left-1/2 -translate-x-1/2 z-20 w-[92%] sm:w-auto">
-        <div class="p-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-2xl flex items-center justify-between sm:justify-center gap-1.5">
-          <div class="px-2.5 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden md:block">
-            Vehicle Filter:
+      <!-- Floating Controls: Vehicle Selector & Horizontal Hotspots -->
+      <div class="absolute top-14 sm:top-20 left-1/2 -translate-x-1/2 z-20 w-[96%] max-w-xl flex flex-col gap-1.5 items-center pointer-events-none">
+        <!-- Vehicle Filter Bar -->
+        <div class="p-1 sm:p-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-2xl flex items-center justify-between w-full sm:w-auto sm:justify-center gap-1 pointer-events-auto">
+          <div class="px-2.5 py-1 text-xs font-semibold text-slate-400 uppercase tracking-wider hidden lg:block">
+            Vehicle:
           </div>
 
           <button
@@ -105,10 +105,11 @@ import { RouterLink } from '@angular/router';
             [class]="selectedVehicle() === 'All'
               ? 'bg-cyan-500 text-slate-950 shadow-md font-bold'
               : 'text-slate-300 hover:bg-slate-800'"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition"
+            class="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition"
           >
             <span>🧭</span>
-            <span>All Floods</span>
+            <span class="hidden sm:inline">All Floods</span>
+            <span class="sm:hidden">All</span>
           </button>
 
           <button
@@ -116,10 +117,11 @@ import { RouterLink } from '@angular/router';
             [class]="selectedVehicle() === 'Motorcycle'
               ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
               : 'text-slate-300 hover:bg-slate-800'"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition"
+            class="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition"
           >
             <span>🏍️</span>
-            <span>Motorcycle</span>
+            <span class="hidden sm:inline">Motorcycle</span>
+            <span class="sm:hidden">Moto</span>
           </button>
 
           <button
@@ -127,7 +129,7 @@ import { RouterLink } from '@angular/router';
             [class]="selectedVehicle() === 'Sedan'
               ? 'bg-blue-500 text-slate-950 shadow-md font-bold'
               : 'text-slate-300 hover:bg-slate-800'"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition"
+            class="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition"
           >
             <span>🚗</span>
             <span>Sedan</span>
@@ -138,28 +140,100 @@ import { RouterLink } from '@angular/router';
             [class]="selectedVehicle() === 'Suv'
               ? 'bg-emerald-500 text-slate-950 shadow-md font-bold'
               : 'text-slate-300 hover:bg-slate-800'"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition"
+            class="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition"
           >
             <span>🚙</span>
-            <span>SUV / Jeep</span>
+            <span class="hidden sm:inline">SUV / Jeep</span>
+            <span class="sm:hidden">SUV</span>
           </button>
+        </div>
+
+        <!-- Horizontal Hotspots Bar (Touch Friendly on Mobile) -->
+        <div class="w-full flex items-center justify-start sm:justify-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-1 pointer-events-auto">
+          @for (preset of geoService.presets; track preset.name) {
+            <button
+              (click)="jumpToPreset(preset)"
+              class="whitespace-nowrap flex-shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-medium bg-slate-900/85 hover:bg-cyan-600 hover:text-white backdrop-blur-md border border-slate-700/80 text-slate-300 shadow-md transition active:scale-95"
+            >
+              {{ preset.name.split(' ')[0] }}
+            </button>
+          }
         </div>
       </div>
 
       <!-- Live Map Container -->
-      <div #mapContainer class="w-full h-full"></div>
+      <div #mapContainer class="w-full flex-1 touch-pan-x touch-pan-y"></div>
+
+      <!-- Floating Bottom Action Cluster (Thumb-Zone Navigation for Mobile) -->
+      <div class="absolute bottom-5 right-4 z-20 flex flex-col items-end gap-2.5 pointer-events-auto">
+        <!-- GPS Re-Center Button -->
+        <button
+          (click)="recenterToGps()"
+          title="Re-center to my location"
+          aria-label="Re-center to my location"
+          class="w-11 h-11 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-cyan-400 border border-slate-700 shadow-2xl flex items-center justify-center transition active:scale-95 backdrop-blur-sm"
+        >
+          <span class="text-xl">📍</span>
+        </button>
+
+        <!-- Mobile Legend Toggle Button -->
+        <button
+          (click)="showMobileLegend.set(!showMobileLegend())"
+          title="Toggle Passability Legend"
+          aria-label="Toggle Passability Legend"
+          class="lg:hidden w-11 h-11 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700 shadow-2xl flex items-center justify-center transition active:scale-95 backdrop-blur-sm"
+        >
+          <span class="text-lg">🚦</span>
+        </button>
+
+        <!-- Mobile Floating Action Report Button -->
+        <button
+          (click)="isReportModalOpen.set(true)"
+          class="sm:hidden flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-2xl shadow-cyan-500/40 active:scale-95 transition"
+        >
+          <span class="text-base">📸</span>
+          <span>Report Flood</span>
+        </button>
+      </div>
+
+      <!-- Mobile Passability Legend Drawer -->
+      @if (showMobileLegend()) {
+        <div class="lg:hidden absolute bottom-20 left-4 right-4 z-30 p-4 rounded-2xl bg-slate-900/95 backdrop-blur-lg border border-slate-700 shadow-2xl text-xs animate-in slide-in-from-bottom duration-200">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <h4 class="font-bold text-white flex items-center gap-1.5">
+              <span>🚦</span>
+              <span>Passability Legend ({{ selectedVehicle() }})</span>
+            </h4>
+            <button (click)="showMobileLegend.set(false)" class="text-slate-400 hover:text-white p-1">✕</button>
+          </div>
+          <div class="mt-2.5 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="text-slate-200">Safe / Passable for {{ selectedVehicle() }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              <span class="text-slate-200">Caution (Tire-deep water level)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+              <span class="text-slate-200">Hazard / Submerged (Impassable)</span>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Real-Time Incoming Incident Toast Alert -->
       @if (recentBroadcast(); as liveAlert) {
-        <div class="absolute bottom-6 right-6 z-30 max-w-sm w-full p-4 rounded-2xl bg-slate-900/95 backdrop-blur-lg border border-cyan-500/50 shadow-2xl animate-bounce">
+        <div class="absolute bottom-20 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 z-30 sm:max-w-sm p-4 rounded-2xl bg-slate-900/95 backdrop-blur-lg border border-cyan-500/50 shadow-2xl animate-in slide-in-from-bottom-3 duration-200">
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2 text-cyan-400 font-bold text-sm">
               <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
               <span>New Verified Alert!</span>
             </div>
-            <button (click)="recentBroadcast.set(null)" class="text-slate-400 hover:text-white text-xs">✕</button>
+            <button (click)="recentBroadcast.set(null)" class="text-slate-400 hover:text-white text-xs p-1">✕</button>
           </div>
-          <p class="mt-1 font-semibold text-white text-sm">{{ liveAlert.extractedLocationName }}</p>
+          <p class="mt-1 font-semibold text-white text-sm line-clamp-1">{{ liveAlert.extractedLocationName }}</p>
           <div class="mt-2 space-y-2">
             <div class="flex items-center gap-2">
               <app-depth-indicator [depthCategory]="liveAlert.depthCategory" [inches]="liveAlert.estimatedDepthInches" />
@@ -180,7 +254,7 @@ import { RouterLink } from '@angular/router';
         </div>
       }
 
-      <!-- Quick Info Floating Card on Left -->
+      <!-- Desktop Quick Info Floating Card on Left -->
       <div class="hidden lg:block absolute bottom-6 left-6 z-20 w-80 p-4 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800 shadow-xl text-xs">
         <h3 class="font-bold text-white text-sm mb-1 flex items-center gap-1.5">
           <span>🚦</span>
@@ -227,6 +301,7 @@ export class LiveMapComponent implements OnInit {
 
   public readonly selectedVehicle = signal<VehicleType>('All');
   public readonly isReportModalOpen = signal<boolean>(false);
+  public readonly showMobileLegend = signal<boolean>(false);
   public readonly activeReports = signal<FloodReport[]>([]);
   public readonly recentBroadcast = signal<FloodReport | null>(null);
 
@@ -253,8 +328,8 @@ export class LiveMapComponent implements OnInit {
       zoomControl: false
     });
 
-    // Add Zoom Control at bottom right
-    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    // Add Zoom Control at bottom left so it doesn't overlap bottom right FABs
+    L.control.zoom({ position: 'bottomleft' }).addTo(this.map);
 
     // Free OpenStreetMap Tile Layer for Metro Manila
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -290,6 +365,14 @@ export class LiveMapComponent implements OnInit {
     L.marker([lat, lng], { icon: gpsIcon, title: 'Your Current Location' })
       .addTo(this.map)
       .bindPopup('<b class="text-slate-900 text-xs">📍 Your GPS Location</b>');
+  }
+
+  public recenterToGps(): void {
+    this.geoService.requestCurrentPosition();
+    const coords = this.geoService.currentCoords();
+    if (this.map) {
+      this.map.flyTo([coords.lat, coords.lng], 16, { duration: 1.2 });
+    }
   }
 
   public loadNearbyReports(): void {
@@ -369,7 +452,7 @@ export class LiveMapComponent implements OnInit {
       const marker = L.marker([report.latitude, report.longitude], { icon })
         .bindPopup(this.createPopupContent(report), {
           className: 'flood-popup',
-          maxWidth: 320
+          maxWidth: typeof window !== 'undefined' ? Math.min(window.innerWidth - 48, 320) : 300
         });
 
       this.markersLayer?.addLayer(marker);

@@ -21,29 +21,32 @@ import { FloodApiService } from '../../core/services/flood-api.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
+      class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-hidden sm:overflow-y-auto"
       (click)="onBackdropClick($event)"
       (keydown.escape)="close.emit()"
       tabindex="-1"
     >
       <div
-        class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden text-slate-100 my-8 animate-in fade-in zoom-in-95 duration-200"
+        class="relative w-full sm:max-w-lg bg-slate-900 border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-100 flex flex-col max-h-[92dvh] sm:max-h-[90vh] my-0 sm:my-8 animate-in slide-in-from-bottom sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200"
         (click)="$event.stopPropagation()"
       >
+        <!-- Mobile Bottom Sheet Drag Handle Indicator -->
+        <div class="sm:hidden w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto mt-2.5 mb-1 flex-shrink-0"></div>
+
         <!-- Modal Header -->
-        <div class="px-6 py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-800 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
+        <div class="px-4 sm:px-6 py-3.5 sm:py-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-2.5 sm:gap-3">
+            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-cyan-500/20 flex-shrink-0">
               📸
             </div>
             <div>
-              <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                Report Live Flood
-                <span class="px-2 py-0.5 text-[10px] uppercase font-extrabold rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+              <h2 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-1.5 sm:gap-2">
+                <span>Report Live Flood</span>
+                <span class="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] uppercase font-extrabold rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
                   AI Calibrated
                 </span>
               </h2>
-              <p class="text-xs text-slate-400">Crowdsourced & analyzed via Gemini Multimodal Vision</p>
+              <p class="text-[11px] sm:text-xs text-slate-400">Crowdsourced & analyzed via Gemini Multimodal Vision</p>
             </div>
           </div>
           <button
@@ -57,7 +60,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
         </div>
 
         <!-- Form Body -->
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="p-6 space-y-4">
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="p-4 sm:p-6 space-y-3.5 sm:space-y-4 overflow-y-auto flex-1">
           @if (errorMessage()) {
             <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
               <span>⚠️</span>
@@ -75,7 +78,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
               formControlName="rawDescription"
               rows="3"
               placeholder="e.g. Hanggang binti na sa may tapat ng UST Dapitan, baha na at di na makadaan ang motor..."
-              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-slate-100 placeholder-slate-500 text-xs resize-none outline-none transition"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-slate-100 placeholder-slate-500 text-sm sm:text-xs resize-none outline-none transition"
             ></textarea>
             @if (form.controls.rawDescription.touched && form.controls.rawDescription.invalid) {
               <p class="mt-1 text-[11px] text-rose-400">Please provide a brief description (min 5 characters).</p>
@@ -84,12 +87,12 @@ import { FloodApiService } from '../../core/services/flood-api.service';
             <!-- Taglish Quick Presets -->
             <div class="mt-2">
               <span class="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Quick suggestions:</span>
-              <div class="mt-1 flex flex-wrap gap-1.5">
+              <div class="mt-1 flex gap-1.5 overflow-x-auto no-scrollbar sm:flex-wrap pb-0.5">
                 @for (preset of quickPresets; track preset.label) {
                   <button
                     type="button"
                     (click)="applyPreset(preset.text)"
-                    class="px-2 py-0.5 rounded-lg text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700/60 transition"
+                    class="whitespace-nowrap flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] sm:text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700/60 transition active:scale-95"
                   >
                     {{ preset.label }}
                   </button>
@@ -101,7 +104,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
           <!-- Photo Upload & Vision Preview -->
           <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Photo Evidence <span class="text-slate-500 font-normal">(Optional - Triggers Vision AI Calibration)</span>
+              Photo Evidence <span class="text-slate-500 font-normal">(Optional - Vision AI Calibration)</span>
             </label>
 
             @if (previewUrl()) {
@@ -123,15 +126,19 @@ import { FloodApiService } from '../../core/services/flood-api.service';
             } @else {
               <label
                 for="photoInput"
-                class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-700 hover:border-cyan-500/60 rounded-2xl cursor-pointer bg-slate-950/50 hover:bg-slate-950 transition text-center"
+                class="flex flex-col items-center justify-center p-3.5 sm:p-4 border-2 border-dashed border-slate-700 hover:border-cyan-500/60 rounded-2xl cursor-pointer bg-slate-950/50 hover:bg-slate-950 transition text-center active:bg-slate-900"
               >
-                <span class="text-2xl mb-1">📷</span>
-                <span class="text-xs font-medium text-slate-300">Click to upload street photo or screenshot</span>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-2xl">📷</span>
+                  <span class="text-xs font-semibold text-cyan-400">Snap Photo or Upload</span>
+                </div>
+                <span class="text-[11px] text-slate-400">Tap to snap with camera or pick from gallery</span>
                 <span class="text-[10px] text-slate-500 mt-0.5">JPG, PNG, WEBP up to 10MB</span>
                 <input
                   id="photoInput"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
                   (change)="onFileSelected($event)"
                   class="hidden"
                 />
@@ -140,7 +147,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
           </div>
 
           <!-- Location & City Grid -->
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label for="citySelect" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
                 City / LGU <span class="text-cyan-400">*</span>
@@ -148,7 +155,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
               <select
                 id="citySelect"
                 formControlName="city"
-                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:border-cyan-500 outline-none"
+                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-sm sm:text-xs focus:border-cyan-500 outline-none"
               >
                 @for (c of cities; track c) {
                   <option [value]="c">{{ c }}</option>
@@ -165,7 +172,7 @@ import { FloodApiService } from '../../core/services/flood-api.service';
                 type="text"
                 formControlName="barangay"
                 placeholder="e.g. Brgy. 471, Sampaloc"
-                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:border-cyan-500 outline-none placeholder-slate-500"
+                class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-sm sm:text-xs focus:border-cyan-500 outline-none placeholder-slate-500"
               />
             </div>
           </div>
@@ -208,24 +215,24 @@ import { FloodApiService } from '../../core/services/flood-api.service';
               type="text"
               formControlName="reporterAlias"
               placeholder="e.g. España Commuter or Angkas Rider"
-              class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:border-cyan-500 outline-none placeholder-slate-500"
+              class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-sm sm:text-xs focus:border-cyan-500 outline-none placeholder-slate-500"
             />
           </div>
 
           <!-- Actions -->
-          <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+          <div class="pt-3 pb-safe border-t border-slate-800 flex items-center justify-end gap-3 flex-shrink-0">
             <button
               type="button"
               (click)="close.emit()"
               [disabled]="isSubmitting()"
-              class="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              class="px-4 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               [disabled]="form.invalid || isSubmitting()"
-              class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 transition active:scale-95"
+              class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-800 disabled:text-slate-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-500/25 transition active:scale-95"
             >
               @if (isSubmitting()) {
                 <span class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
