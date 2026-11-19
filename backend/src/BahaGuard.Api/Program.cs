@@ -10,6 +10,9 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load optional local developer overrides (ignored by .gitignore)
+builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
+
 // 1. Core Framework Services & Controllers
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

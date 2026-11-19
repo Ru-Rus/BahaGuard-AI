@@ -138,6 +138,57 @@ public class ReportsController(
     }
 
     /// <summary>
+    /// Submit a flood incident report with JSON payload (no photo).
+    /// Evaluated by AI and broadcast to nearby commuters in real time.
+    /// </summary>
+    [HttpPost]
+    [Consumes("application/json")]
+    [ActionName("CreateReportJson")]
+    [EnableRateLimiting("ReportsPostPolicy")]
+    [ProducesResponseType(typeof(FloodReportResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> CreateReportJson(
+        [FromBody] CreateFloodReportDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var createdReport = await floodReportService.CreateReportAsync(
+                request,
+                imageStream: null,
+                mimeType: null,
+                cancellationToken);
+
+            var cityGroup = createdReport.City.Trim().ToLowerInvariant();
+            await hubContext.Clients.Group(cityGroup).ReceiveNewFloodReport(createdReport);
+
+            return CreatedAtAction(nameof(GetById), new { id = createdReport.Id }, createdReport);
+        }
+        catch (ArgumentException ex)
+        {
+            logger.LogWarning(ex, "Flood report validation or AI rejection: {Message}", ex.Message);
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Report rejected by flood analyzer",
+                detail: ex.Message);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create flood report from JSON submission.");
+            return Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Failed to process flood report",
+                detail: ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Find active flood reports within a radius (in meters) of GPS coordinates, with optional vehicle passability filter.
     /// </summary>
     [HttpGet("nearby")]

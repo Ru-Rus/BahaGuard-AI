@@ -39,6 +39,19 @@ services:
     networks:
       - bahaguard-network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bahaguard-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4200:80"
+    networks:
+      - bahaguard-network
+
 volumes:
   sqlserver_data:
     driver: local
