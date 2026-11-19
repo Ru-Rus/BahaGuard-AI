@@ -7,7 +7,6 @@ using BahaGuard.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
-using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,14 +95,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// 7. OpenAPI & Scalar UI Documentation
+// 7. OpenAPI & Swagger UI Documentation
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(options =>
+    app.UseSwaggerUI(options =>
     {
-        options.Title = "BahaGuard AI API";
-        options.Theme = ScalarTheme.Purple;
+        options.SwaggerEndpoint("/openapi/v1.json", "BahaGuard AI API v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "BahaGuard AI - Swagger UI";
+        options.DisplayRequestDuration();
     });
 }
 
