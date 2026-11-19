@@ -89,3 +89,15 @@ export interface ConfirmReportResponse {
   expiresAt: string;
   message: string;
 }
+
+export interface NewsIngestionResult {
+  totalItemsPolled: number;
+  floodIncidentsDetected: number;
+  newReportsCreated: number;
+  duplicatesMerged: number;
+  itemsSkippedNonFlood: number;
+  createdReports: FloodReport[];
+  mergedReports: FloodReport[];
+  processedAt: string;
+}
+

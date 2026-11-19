@@ -72,6 +72,17 @@ import { RouterLink } from '@angular/router';
             ></span>
           </div>
 
+          <!-- News Alert Sync Button -->
+          <button
+            (click)="triggerNewsIngest()"
+            [disabled]="isIngestingNews()"
+            title="Ingest latest MMDA and PAGASA disaster news feeds"
+            class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 font-medium text-xs border border-slate-700/80 transition shadow-sm active:scale-95 disabled:opacity-50"
+          >
+            <span [class.animate-spin]="isIngestingNews()">📡</span>
+            <span class="hidden md:inline">{{ isIngestingNews() ? 'Syncing...' : 'Sync News' }}</span>
+          </button>
+
           <!-- Property Auditor Link -->
           <a
             routerLink="/audit"
@@ -229,7 +240,7 @@ import { RouterLink } from '@angular/router';
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2 text-cyan-400 font-bold text-sm">
               <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-              <span>New Verified Alert!</span>
+              <span>{{ isOfficial(liveAlert) ? '🚨 Official News Alert!' : 'New Verified Alert!' }}</span>
             </div>
             <button (click)="recentBroadcast.set(null)" class="text-slate-400 hover:text-white text-xs p-1">✕</button>
           </div>
@@ -302,6 +313,7 @@ export class LiveMapComponent implements OnInit {
   public readonly selectedVehicle = signal<VehicleType>('All');
   public readonly isReportModalOpen = signal<boolean>(false);
   public readonly showMobileLegend = signal<boolean>(false);
+  public readonly isIngestingNews = signal<boolean>(false);
   public readonly activeReports = signal<FloodReport[]>([]);
   public readonly recentBroadcast = signal<FloodReport | null>(null);
 
@@ -410,6 +422,31 @@ export class LiveMapComponent implements OnInit {
     this.loadNearbyReports();
   }
 
+  public triggerNewsIngest(): void {
+    if (this.isIngestingNews()) return;
+    this.isIngestingNews.set(true);
+
+    this.apiService.ingestNewsAlerts()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (result) => {
+          this.isIngestingNews.set(false);
+          this.loadNearbyReports();
+          console.log(`News Ingestion finished: ${result.newReportsCreated} new reports created, ${result.duplicatesMerged} corroborated.`);
+        },
+        error: (err) => {
+          this.isIngestingNews.set(false);
+          console.error('Failed to trigger news ingestion:', err);
+        }
+      });
+  }
+
+  public isOfficial(report: FloodReport | null): boolean {
+    if (!report?.reporterAlias) return false;
+    const a = report.reporterAlias;
+    return a.includes('MMDA') || a.includes('Official') || a.includes('PAGASA') || a.includes('News') || a.includes('Bulletin') || a.includes('Disaster');
+  }
+
   public focusOnReport(report: FloodReport): void {
     if (this.map) {
       this.map.flyTo([report.latitude, report.longitude], 16, { duration: 1 });
@@ -507,18 +544,30 @@ export class LiveMapComponent implements OnInit {
          </div>`
       : '';
 
+    const isOfficialSource = this.isOfficial(report);
+    const sourceTag = isOfficialSource
+      ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+           <span>🚨</span>
+           <span>${report.reporterAlias}</span>
+         </span>`
+      : `<span class="text-slate-400 text-[10px]">Reported by ${report.reporterAlias || 'Metro Commuter'}</span>`;
+
     return `
       <div class="p-4 bg-slate-900 text-slate-100 rounded-2xl text-xs max-w-xs">
         ${photoTag}
-        <div class="mt-2 flex items-center justify-between">
+        <div class="mt-2 flex items-center justify-between gap-1">
           <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-cyan-400 border border-slate-700">
             ${report.depthCategory} (${report.estimatedDepthInches}")
           </span>
           <span class="text-slate-400 text-[10px]">AI Conf: ${Math.round(report.aiConfidenceScore * 100)}%</span>
         </div>
 
+        <div class="mt-1.5 flex items-center">
+          ${sourceTag}
+        </div>
+
         <h4 class="mt-2 font-bold text-white text-sm leading-snug">${report.extractedLocationName}</h4>
-        <p class="mt-1 text-slate-300 italic">"${report.rawDescription}"</p>
+        <p class="mt-1 text-slate-300 italic whitespace-pre-line">"${report.rawDescription}"</p>
 
         <div class="mt-3 pt-2 border-t border-slate-800 space-y-1">
           <div class="flex justify-between items-center text-[11px]">

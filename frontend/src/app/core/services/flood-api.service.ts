@@ -8,6 +8,7 @@ import {
   CreateReportRequest,
   FloodReport,
   NearbyReportsQuery,
+  NewsIngestionResult,
   PropertyAuditResponse
 } from '../models/flood-report.model';
 
@@ -70,5 +71,13 @@ export class FloodApiService {
       params = params.set('lat', lat.toString()).set('lng', lng.toString());
     }
     return this.http.get<PropertyAuditResponse>(`${this.baseUrl}/property-audit`, { params });
+  }
+
+  ingestNewsAlerts(): Observable<NewsIngestionResult> {
+    return this.http.post<NewsIngestionResult>(`${this.baseUrl}/newsalerts/ingest`, {});
+  }
+
+  getRecentOfficialAlerts(limit: number = 20): Observable<FloodReport[]> {
+    return this.http.get<FloodReport[]>(`${this.baseUrl}/newsalerts/recent?limit=${limit}`);
   }
 }
