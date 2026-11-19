@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BahaGuard.Api/BahaGuard.Api.csproj" />
+    <Project Path="src/BahaGuard.Application/BahaGuard.Application.csproj" />
+    <Project Path="src/BahaGuard.Domain/BahaGuard.Domain.csproj" />
+    <Project Path="src/BahaGuard.Infrastructure/BahaGuard.Infrastructure.csproj" />
+  </Folder>
+</Solution>
