@@ -117,6 +117,55 @@ public class FloodReportService(
         return report == null ? null : MapToDto(report, distanceMeters: null);
     }
 
+    public async Task<ConfirmReportResponseDto> ConfirmReportAsync(
+        Guid id,
+        ConfirmReportRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await dbContext.FloodReports
+            .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+        if (report == null)
+        {
+            throw new KeyNotFoundException($"Flood report with ID '{id}' was not found.");
+        }
+
+        string message;
+        var now = DateTimeOffset.UtcNow;
+
+        if (request.StillFlooded)
+        {
+            // Extend validity by 1 hour (capped at max 6 hours from original creation)
+            var maxExpiry = report.CreatedAt.AddHours(6);
+            var newExpiry = report.ExpiresAt.AddHours(1);
+
+            report.ExpiresAt = newExpiry > maxExpiry ? maxExpiry : newExpiry;
+            if (report.Status != "Active")
+            {
+                report.Status = "Active";
+            }
+            message = $"Flood still active. Validity extended until {report.ExpiresAt:HH:mm} UTC.";
+        }
+        else
+        {
+            // Mark as receding and shorten lifespan
+            report.Status = "Receding";
+            report.ExpiresAt = now.AddMinutes(20);
+            message = "Flood subsidence confirmed. Status updated to Receding.";
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Report {ReportId} confirmed (StillFlooded={StillFlooded}). New status={Status}, expires={ExpiresAt}",
+            id, request.StillFlooded, report.Status, report.ExpiresAt);
+
+        return new ConfirmReportResponseDto(
+            ReportId: report.Id,
+            Status: report.Status,
+            ExpiresAt: report.ExpiresAt,
+            Message: message
+        );
+    }
+
     private static FloodReportResponseDto MapToDto(FloodReport report, double? distanceMeters)
     {
         return new FloodReportResponseDto(

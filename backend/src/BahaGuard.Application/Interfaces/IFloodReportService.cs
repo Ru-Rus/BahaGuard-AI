@@ -17,4 +17,9 @@ public interface IFloodReportService
     Task<FloodReportResponseDto?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    Task<ConfirmReportResponseDto> ConfirmReportAsync(
+        Guid id,
+        ConfirmReportRequestDto request,
+        CancellationToken cancellationToken = default);
 }

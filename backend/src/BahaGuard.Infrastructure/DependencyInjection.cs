@@ -47,6 +47,12 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
         });
 
+        services.AddHttpClient<IPropertyAuditService, Services.PropertyAuditService>((sp, client) =>
+        {
+            var options = configuration.GetSection(GeminiOptions.SectionName).Get<GeminiOptions>() ?? new GeminiOptions();
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds > 0 ? options.TimeoutSeconds : 30);
+        });
+
         services.AddHostedService<ReportExpirationWorker>();
 
         return services;

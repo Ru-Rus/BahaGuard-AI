@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using BahaGuard.Api.Hubs;
 using BahaGuard.Application;
+using BahaGuard.Application.Interfaces;
 using BahaGuard.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -29,6 +30,7 @@ builder.Services.AddOpenApi();
 // 2. Application & Infrastructure Layers (Clean Architecture)
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IFloodAlertNotifier, SignalRFloodAlertNotifier>();
 
 // 3. CORS Policy for Angular Frontend
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
@@ -133,6 +135,20 @@ app.MapGet("/api/health", () => Results.Ok(new
     Timestamp = DateTimeOffset.UtcNow,
     Version = "1.0.0"
 }));
+
+// Auto-seed historical flood records for Property Risk Auditor
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<BahaGuard.Infrastructure.Data.BahaGuardDbContext>();
+        await BahaGuard.Infrastructure.Data.HistoricalDataSeeder.SeedHistoricalDataAsync(db);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Historical flood data seeding skipped on startup.");
+    }
+}
 
 app.Run();
 

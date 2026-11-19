@@ -2,7 +2,14 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CreateReportRequest, FloodReport, NearbyReportsQuery } from '../models/flood-report.model';
+import {
+  ConfirmReportRequest,
+  ConfirmReportResponse,
+  CreateReportRequest,
+  FloodReport,
+  NearbyReportsQuery,
+  PropertyAuditResponse
+} from '../models/flood-report.model';
 
 @Injectable({
   providedIn: 'root'
@@ -50,11 +57,18 @@ export class FloodApiService {
     return this.http.post<FloodReport>(`${this.baseUrl}/reports`, formData);
   }
 
-  getPropertyAudit(address: string, lat?: number, lng?: number): Observable<any> {
-    let params = new HttpParams().set('address', address);
+  confirmReport(id: string, request: ConfirmReportRequest): Observable<ConfirmReportResponse> {
+    return this.http.post<ConfirmReportResponse>(`${this.baseUrl}/reports/${id}/confirm`, request);
+  }
+
+  getPropertyAudit(address: string, lat?: number, lng?: number, radiusMeters: number = 500): Observable<PropertyAuditResponse> {
+    let params = new HttpParams()
+      .set('address', address)
+      .set('radiusMeters', radiusMeters.toString());
+
     if (lat !== undefined && lng !== undefined) {
       params = params.set('lat', lat.toString()).set('lng', lng.toString());
     }
-    return this.http.get<any>(`${this.baseUrl}/property-audit`, { params });
+    return this.http.get<PropertyAuditResponse>(`${this.baseUrl}/property-audit`, { params });
   }
 }

@@ -46,3 +46,46 @@ export interface CreateReportRequest {
   city?: string;
   photo?: File;
 }
+
+export interface VehicleVulnerability {
+  motorcycleHighRisk: boolean;
+  sedanHighRisk: boolean;
+  suvHighRisk: boolean;
+  parkingAdvisory: string;
+}
+
+export interface TenantDueDiligence {
+  executiveSummary: string;
+  groundFloorRiskAdvice: string;
+  electricalAndUtilityRisk: string;
+  evacuationAndAccessAdvisory: string;
+}
+
+export interface PropertyAuditResponse {
+  address: string;
+  resolvedLocationName: string;
+  latitude: number;
+  longitude: number;
+  riskScore: number;
+  riskLevel: 'Low' | 'Moderate' | 'High' | 'Extreme';
+  historicalIncidentsCount: number;
+  averageDepthInches: number;
+  maxDepthInches: number;
+  predominantDepthCategory: string;
+  estimatedRecedingTimeHours: number;
+  vehicleVulnerability: VehicleVulnerability;
+  dueDiligenceReport: TenantDueDiligence;
+  auditedAt: string;
+}
+
+export interface ConfirmReportRequest {
+  stillFlooded: boolean;
+  reporterAlias?: string;
+}
+
+export interface ConfirmReportResponse {
+  reportId: string;
+  status: string;
+  expiresAt: string;
+  message: string;
+}

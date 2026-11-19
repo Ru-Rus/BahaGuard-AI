@@ -7,24 +7,15 @@ import {
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { PropertyAuditResponse } from '../../core/models/flood-report.model';
 import { FloodApiService } from '../../core/services/flood-api.service';
-
-export interface AuditMockResult {
-  address: string;
-  barangay: string;
-  riskRating: 'High' | 'Moderate' | 'Low';
-  historicalEventsCount: number;
-  averageInundationDepth: string;
-  recedingTimeHours: number;
-  passabilitySummary: string;
-  geminiDueDiligenceNotice: string;
-}
 
 @Component({
   selector: 'app-property-auditor',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, DatePipe, DecimalPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-slate-950 text-slate-100 font-sans">
@@ -60,13 +51,13 @@ export interface AuditMockResult {
         <div class="text-center space-y-2 max-w-xl mx-auto">
           <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold">
             <span>🛡️</span>
-            <span>Tenant & Renter Due Diligence</span>
+            <span>Spatial Tenant & Dorm Due Diligence</span>
           </div>
           <h1 class="text-3xl font-extrabold text-white tracking-tight">
             Property Flood-Risk Auditor
           </h1>
           <p class="text-xs sm:text-sm text-slate-400">
-            Audit any apartment, condo, dorm, or commercial space in Metro Manila against spatial flood records before signing a lease.
+            Audit any apartment, condo, student dorm, or property in Metro Manila against spatial flood records before signing a lease.
           </p>
         </div>
 
@@ -78,7 +69,7 @@ export interface AuditMockResult {
               <input
                 type="text"
                 formControlName="address"
-                placeholder="Enter address or dorm (e.g. 839 Lacson Ave, Sampaloc, Manila)"
+                placeholder="Enter address or landmark (e.g. 839 Lacson Ave, Sampaloc, Manila)"
                 class="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-950 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-slate-100 placeholder-slate-500 text-xs outline-none transition"
               />
             </div>
@@ -89,7 +80,7 @@ export interface AuditMockResult {
             >
               @if (isLoading()) {
                 <span class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                <span>Auditing Spatial Data...</span>
+                <span>Auditing Spatial Database...</span>
               } @else {
                 <span>🔍</span>
                 <span>Audit Property</span>
@@ -99,7 +90,7 @@ export interface AuditMockResult {
 
           <!-- Quick Landmark Chips -->
           <div class="flex flex-wrap items-center gap-1.5 pt-1">
-            <span class="text-[11px] text-slate-400 font-semibold mr-1">Popular Student Areas:</span>
+            <span class="text-[11px] text-slate-400 font-semibold mr-1">Popular Hotspots:</span>
             @for (area of sampleLocations; track area.name) {
               <button
                 type="button"
@@ -115,68 +106,130 @@ export interface AuditMockResult {
         <!-- Audit Result Card -->
         @if (currentResult(); as res) {
           <div class="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <!-- Header & Score -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div>
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Target Address</span>
-                <h3 class="text-lg font-bold text-white mt-0.5">{{ res.address }}</h3>
-                <p class="text-xs text-cyan-400">{{ res.barangay }}</p>
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Audited Location</span>
+                <h3 class="text-lg font-bold text-white mt-0.5">{{ res.resolvedLocationName }}</h3>
+                <p class="text-xs text-cyan-400 font-mono mt-0.5">GPS: {{ res.latitude | number:'1.4-4' }}, {{ res.longitude | number:'1.4-4' }}</p>
               </div>
 
-              <!-- Risk Badge -->
-              <div class="flex items-center gap-2">
+              <!-- Risk Score Gauge -->
+              <div class="flex items-center gap-3">
+                <div class="text-right">
+                  <div class="text-2xl font-black"
+                    [class]="res.riskScore >= 7 ? 'text-rose-400' : res.riskScore >= 4 ? 'text-amber-400' : 'text-emerald-400'">
+                    {{ res.riskScore }}<span class="text-xs text-slate-500 font-normal">/10</span>
+                  </div>
+                  <span class="text-[10px] text-slate-400 uppercase font-semibold">Flood Risk Score</span>
+                </div>
                 <span
-                  [class]="res.riskRating === 'High'
+                  [class]="res.riskLevel === 'Extreme' || res.riskLevel === 'High'
                     ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
-                    : res.riskRating === 'Moderate'
+                    : res.riskLevel === 'Moderate'
                     ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                     : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'"
-                  class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wider border shadow-sm flex items-center gap-1.5"
+                  class="px-3.5 py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider border shadow-sm flex items-center gap-1.5"
                 >
                   <span class="w-2 h-2 rounded-full animate-ping"
-                    [class]="res.riskRating === 'High' ? 'bg-rose-400' : res.riskRating === 'Moderate' ? 'bg-amber-400' : 'bg-emerald-400'">
+                    [class]="res.riskLevel === 'Extreme' || res.riskLevel === 'High' ? 'bg-rose-400' : res.riskLevel === 'Moderate' ? 'bg-amber-400' : 'bg-emerald-400'">
                   </span>
-                  <span>{{ res.riskRating }} Flood Risk</span>
+                  <span>{{ res.riskLevel }} Risk</span>
                 </span>
               </div>
             </div>
 
-            <!-- Historical Spatial Metrics Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80">
-                <span class="text-[11px] uppercase font-semibold text-slate-400">Historical Incidents</span>
-                <p class="text-2xl font-black text-white mt-1">{{ res.historicalEventsCount }}</p>
-                <span class="text-[10px] text-slate-500">Recorded during past typhoons</span>
+            <!-- Spatial Metrics Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                <span class="text-[10px] uppercase font-semibold text-slate-400">Historical Events</span>
+                <p class="text-xl font-black text-white mt-0.5">{{ res.historicalIncidentsCount }}</p>
+                <span class="text-[10px] text-slate-500">In 500m radius</span>
               </div>
 
-              <div class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80">
-                <span class="text-[11px] uppercase font-semibold text-slate-400">Typical Depth</span>
-                <p class="text-2xl font-black text-amber-400 mt-1">{{ res.averageInundationDepth }}</p>
-                <span class="text-[10px] text-slate-500">Road level submergence</span>
+              <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                <span class="text-[10px] uppercase font-semibold text-slate-400">Average Depth</span>
+                <p class="text-xl font-black text-amber-400 mt-0.5">{{ res.averageDepthInches }}"</p>
+                <span class="text-[10px] text-slate-500">{{ res.predominantDepthCategory }} level</span>
               </div>
 
-              <div class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80">
-                <span class="text-[11px] uppercase font-semibold text-slate-400">Receding Time</span>
-                <p class="text-2xl font-black text-cyan-400 mt-1">~{{ res.recedingTimeHours }} Hours</p>
-                <span class="text-[10px] text-slate-500">After heavy rainfall halts</span>
+              <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                <span class="text-[10px] uppercase font-semibold text-slate-400">Max Recorded</span>
+                <p class="text-xl font-black text-rose-400 mt-0.5">{{ res.maxDepthInches }}"</p>
+                <span class="text-[10px] text-slate-500">Typhoon peak</span>
+              </div>
+
+              <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80">
+                <span class="text-[10px] uppercase font-semibold text-slate-400">Receding Time</span>
+                <p class="text-xl font-black text-cyan-400 mt-0.5">~{{ res.estimatedRecedingTimeHours }} hrs</p>
+                <span class="text-[10px] text-slate-500">Subsidence duration</span>
               </div>
             </div>
 
-            <!-- Vehicle & Evacuation Advisory -->
-            <div class="p-4 rounded-2xl bg-slate-950/40 border border-slate-800">
-              <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <span>🚗</span>
-                <span>Vehicle & Parking Guidance</span>
+            <!-- Vehicle Vulnerability Matrix -->
+            <div class="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 space-y-2">
+              <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <span>🚦</span>
+                  <span>Vehicle Passability Vulnerability</span>
+                </span>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                    [class]="res.vehicleVulnerability.motorcycleHighRisk ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'">
+                    🏍️ Moto: {{ res.vehicleVulnerability.motorcycleHighRisk ? 'Hazard' : 'Passable' }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                    [class]="res.vehicleVulnerability.sedanHighRisk ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'">
+                    🚗 Sedan: {{ res.vehicleVulnerability.sedanHighRisk ? 'Submerged' : 'Passable' }}
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                    [class]="res.vehicleVulnerability.suvHighRisk ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'">
+                    🚙 SUV: {{ res.vehicleVulnerability.suvHighRisk ? 'Hazard' : 'Passable' }}
+                  </span>
+                </div>
               </h4>
-              <p class="text-xs text-slate-300 leading-relaxed">{{ res.passabilitySummary }}</p>
+              <p class="text-xs text-slate-300 leading-relaxed">{{ res.vehicleVulnerability.parkingAdvisory }}</p>
             </div>
 
-            <!-- Gemini AI Due Diligence Note -->
-            <div class="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-800/40 text-xs space-y-1">
-              <div class="flex items-center gap-2 text-cyan-300 font-bold text-xs">
-                <span>✨</span>
-                <span>Gemini 2.5 Flash Due Diligence Analysis</span>
+            <!-- Gemini AI Tenant Due Diligence Breakdown -->
+            <div class="p-5 rounded-2xl bg-cyan-950/20 border border-cyan-800/40 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-cyan-300 font-bold text-xs uppercase tracking-wider">
+                  <span>✨</span>
+                  <span>Gemini 2.5 Flash Due-Diligence Synthesis</span>
+                </div>
+                <span class="text-[10px] text-slate-400">Audited at {{ res.auditedAt | date:'short' }}</span>
               </div>
-              <p class="text-slate-300 leading-relaxed">{{ res.geminiDueDiligenceNotice }}</p>
+
+              <!-- Executive Summary -->
+              <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+                <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Executive Verdict</span>
+                <p class="text-white font-medium mt-0.5 leading-relaxed">{{ res.dueDiligenceReport.executiveSummary }}</p>
+              </div>
+
+              <!-- 3-Column Advisory -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                  <span class="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1">
+                    <span>🏢</span> Ground-Floor Advice
+                  </span>
+                  <p class="text-slate-300 mt-1 leading-relaxed">{{ res.dueDiligenceReport.groundFloorRiskAdvice }}</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                  <span class="text-[10px] uppercase font-bold text-cyan-400 tracking-wider flex items-center gap-1">
+                    <span>⚡</span> Power & Utilities
+                  </span>
+                  <p class="text-slate-300 mt-1 leading-relaxed">{{ res.dueDiligenceReport.electricalAndUtilityRisk }}</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                  <span class="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1">
+                    <span>🚶</span> Evacuation & Transit
+                  </span>
+                  <p class="text-slate-300 mt-1 leading-relaxed">{{ res.dueDiligenceReport.evacuationAndAccessAdvisory }}</p>
+                </div>
+              </div>
             </div>
           </div>
         }
@@ -189,10 +242,10 @@ export class PropertyAuditorComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isLoading = signal<boolean>(false);
-  readonly currentResult = signal<AuditMockResult | null>(null);
+  readonly currentResult = signal<PropertyAuditResponse | null>(null);
 
   readonly auditForm = new FormGroup({
-    address: new FormControl('839 Lacson Ave, Sampaloc, Manila', {
+    address: new FormControl('España Blvd corner Lacson Ave, Sampaloc, Manila', {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)]
     })
@@ -202,7 +255,8 @@ export class PropertyAuditorComponent {
     { name: 'UST España', address: 'España Blvd corner Lacson Ave, Sampaloc, Manila' },
     { name: 'DLSU Taft', address: '2401 Taft Ave, Malate, Manila' },
     { name: 'PUP Santa Mesa', address: 'Anonas St, Santa Mesa, Manila' },
-    { name: 'Ateneo Katipunan', address: 'Katipunan Ave, Loyola Heights, Quezon City' }
+    { name: 'Araneta Ave QC', address: 'Araneta Ave corner E. Rodriguez, Quezon City' },
+    { name: 'Quiapo Church', address: 'Quezon Blvd, Quiapo, Manila' }
   ];
 
   selectSample(address: string): void {
@@ -220,41 +274,13 @@ export class PropertyAuditorComponent {
       .getPropertyAudit(address)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (backendResp) => {
+        next: (result) => {
           this.isLoading.set(false);
-
-          // Calibrate risk profile based on known Manila flood topography
-          const isHighRisk = /españa|lacson|dapitan|taft|quiapo|blumentritt/i.test(address);
-          const isModRisk = /katipunan|santa mesa|edsa/i.test(address);
-
-          this.currentResult.set({
-            address,
-            barangay: isHighRisk ? 'Sampaloc / Malate Inundation Basin' : 'Metro Manila Zone',
-            riskRating: isHighRisk ? 'High' : isModRisk ? 'Moderate' : 'Low',
-            historicalEventsCount: isHighRisk ? 18 : isModRisk ? 6 : 1,
-            averageInundationDepth: isHighRisk ? '14" - 24" (Knee to Waist)' : isModRisk ? '4" - 8" (Gutter)' : 'Dry',
-            recedingTimeHours: isHighRisk ? 3.5 : 1.2,
-            passabilitySummary: isHighRisk
-              ? 'Ground floor and basement parking at high risk of water intrusion during Habagat/Typhoons. Sedans and motorcycles should be moved to elevated parking before heavy rains.'
-              : 'Street is generally passable with minor gutter puddles. Standard sedans can navigate safely.',
-            geminiDueDiligenceNotice: backendResp?.message ||
-              'Phase 4 spatial records show this street experiences recurrent flash-ponding. Renter recommendation: Inquire about building backflow valves and second-floor emergency egress.'
-          });
+          this.currentResult.set(result);
         },
         error: (err) => {
           this.isLoading.set(false);
           console.error('Audit query error:', err);
-          // Fallback demo audit result
-          this.currentResult.set({
-            address,
-            barangay: 'Sampaloc, Manila',
-            riskRating: 'High',
-            historicalEventsCount: 12,
-            averageInundationDepth: '12" - 18" (Knee Deep)',
-            recedingTimeHours: 2.5,
-            passabilitySummary: 'Ground-level parking vulnerable. Plan alternate parking in Lacson elevated lots during typhoon season.',
-            geminiDueDiligenceNotice: 'Spatial report: High frequency of flood reports logged in the surrounding 500m radius.'
-          });
         }
       });
   }

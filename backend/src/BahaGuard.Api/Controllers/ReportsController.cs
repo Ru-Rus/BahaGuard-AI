@@ -236,6 +236,36 @@ public class ReportsController(
 
         return Ok(report);
     }
+
+    /// <summary>
+    /// Crowdsourced upvote or subsidence report to extend validity or mark receding.
+    /// Broadcasts real-time status update to connected map clients.
+    /// </summary>
+    [HttpPost("{id:guid}/confirm")]
+    [ProducesResponseType(typeof(ConfirmReportResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ConfirmReport(
+        Guid id,
+        [FromBody] ConfirmReportRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await floodReportService.ConfirmReportAsync(id, request, cancellationToken);
+
+            // Broadcast status change to all connected SignalR clients
+            await hubContext.Clients.All.ReceiveReportStatusUpdate(result.ReportId, result.Status);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Not Found",
+                detail: ex.Message);
+        }
+    }
 }
 
 public class CreateReportFormRequest

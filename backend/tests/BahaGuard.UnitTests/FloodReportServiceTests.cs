@@ -147,4 +147,78 @@ public class FloodReportServiceTests
         Assert.Equal(14.5775, found.Latitude);
         Assert.Equal(120.9880, found.Longitude);
     }
+
+    [Fact]
+    public async Task ConfirmReportAsync_WhenStillFlooded_ShouldExtendValidity()
+    {
+        using var context = CreateInMemoryContext();
+
+        var report = FloodReport.Create(
+            rawDescription: "España baha",
+            extractedLocationName: "España Blvd",
+            latitude: 14.6091,
+            longitude: 120.9903,
+            estimatedDepthInches: 12,
+            depthCategory: "Knee",
+            passableMotorcycle: false,
+            passableSedan: false,
+            passableSuvJeepney: true,
+            aiConfidenceScore: 0.90m,
+            lifetime: TimeSpan.FromHours(2)
+        );
+        context.FloodReports.Add(report);
+        await context.SaveChangesAsync();
+
+        var initialExpiry = report.ExpiresAt;
+
+        var mockGemini = new Mock<IGeminiVisionService>();
+        var service = new FloodReportService(context, mockGemini.Object, NullLogger<FloodReportService>.Instance);
+
+        var result = await service.ConfirmReportAsync(report.Id, new ConfirmReportRequestDto(StillFlooded: true));
+
+        Assert.Equal(report.Id, result.ReportId);
+        Assert.Equal("Active", result.Status);
+        Assert.True(result.ExpiresAt > initialExpiry);
+    }
+
+    [Fact]
+    public async Task ConfirmReportAsync_WhenSubsided_ShouldSetStatusToReceding()
+    {
+        using var context = CreateInMemoryContext();
+
+        var report = FloodReport.Create(
+            rawDescription: "Taft baha",
+            extractedLocationName: "Taft Ave",
+            latitude: 14.5776,
+            longitude: 120.9886,
+            estimatedDepthInches: 10,
+            depthCategory: "HalfTire",
+            passableMotorcycle: false,
+            passableSedan: true,
+            passableSuvJeepney: true,
+            aiConfidenceScore: 0.90m
+        );
+        context.FloodReports.Add(report);
+        await context.SaveChangesAsync();
+
+        var mockGemini = new Mock<IGeminiVisionService>();
+        var service = new FloodReportService(context, mockGemini.Object, NullLogger<FloodReportService>.Instance);
+
+        var result = await service.ConfirmReportAsync(report.Id, new ConfirmReportRequestDto(StillFlooded: false));
+
+        Assert.Equal("Receding", result.Status);
+        Assert.Contains("Receding", result.Message);
+    }
+
+    [Fact]
+    public async Task ConfirmReportAsync_WhenNotFound_ShouldThrowKeyNotFoundException()
+    {
+        using var context = CreateInMemoryContext();
+
+        var mockGemini = new Mock<IGeminiVisionService>();
+        var service = new FloodReportService(context, mockGemini.Object, NullLogger<FloodReportService>.Instance);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.ConfirmReportAsync(Guid.NewGuid(), new ConfirmReportRequestDto(StillFlooded: true)));
+    }
 }
